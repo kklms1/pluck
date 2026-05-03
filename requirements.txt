@@ -1,0 +1,19 @@
+playwright>=1.45.0
+beautifulsoup4>=4.12.0
+lxml>=5.2.0
+Pillow>=10.3.0
+pandas>=2.2.0
+customtkinter>=5.2.2
+python-dotenv>=1.0.1
+httpx>=0.27.0
+
+# Cloud AI engines (optional — only needed for the engine you actually use)
+anthropic>=0.40.0
+openai>=1.40.0
+google-generativeai>=0.7.0
+
+# Local OCR — install ONE of these for the free local engine
+# (paddleocr is the recommended default; switch if install fails on your platform)
+paddleocr>=2.7.0
+# easyocr>=1.7.0
+# pytesseract>=0.3.10
