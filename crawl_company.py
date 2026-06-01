@@ -170,8 +170,10 @@ def run(company_name: str, inst_code: str, apba_id: str,
                 logger.info(f"  보수규정 파싱: {Path(local_path).name}")
                 parsed = parse_regulation_file(local_path, company_name)
                 if parsed.hobong_rows:
-                    points = build_career_table(parsed)
+                    from dataclasses import asdict
+                    points = build_career_table(parsed, max_years=30)
                     analysis["career_salary"] = format_career_table(points)
+                    analysis["career_points"] = [asdict(p) for p in points]  # raw 수치(카드/대본용)
                     analysis["allowances"] = dict(parsed.allowances)
                     analysis["allowance_ratios"] = dict(parsed.allowance_ratios)
 

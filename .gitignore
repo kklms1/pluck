@@ -42,8 +42,9 @@ htmlcov/
 
 # 데이터/출력물
 data/pipeline.db
-output/images/
-output/videos/
+data/*.json
+data/regulations/
+output/
 logs/
 
 # 에셋 (용량 큰 바이너리)

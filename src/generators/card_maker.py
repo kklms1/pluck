@@ -383,6 +383,244 @@ def make_card_sequence(
     }
 
 
+def make_welfare_card(
+    company_name: str,
+    welfare: dict = None,        # welfare_parser 결과 (항목별 만원/년)
+    training: dict = None,       # 교육훈련비 결과
+    company_color: tuple = (64, 156, 255),
+    output_path: str = None,
+) -> str:
+    """
+    복지·수당 카드: 복리후생비 항목별 + 교육훈련비를 시각화
+    값은 연 기준(만원)이며 월 환산도 병기
+    """
+    welfare = welfare or {}
+    training = training or {}
+    img = Image.new("RGB", (CANVAS_W, CANVAS_H), PALETTE["bg_dark"])
+    draw = ImageDraw.Draw(img)
+    accent = company_color
+
+    draw.rectangle([0, 0, CANVAS_W, 6], fill=accent)
+    draw.text((60, 40), company_name, font=_font(40, bold=True), fill=accent)
+    draw.text((60, 95), "복리후생 · 1인당 지원 금액 (공시 기준)",
+              font=_font(32), fill=PALETTE["text_dim"])
+
+    # 항목 정의 (label, key, 아이콘 텍스트)
+    rows = [
+        ("식대",          "meal_10k"),
+        ("교통·주유",     "transport_10k"),
+        ("의료·건강검진", "medical_10k"),
+        ("학자금·보육",   "childcare_tuition_10k"),
+        ("주택·사택대출", "housing_loan_10k"),
+        ("문화·여가",     "recreation_10k"),
+        ("복지포인트",    "welfare_point_10k"),
+    ]
+    present = [(lbl, welfare.get(key, 0)) for lbl, key in rows if welfare.get(key, 0)]
+
+    max_val = max((v for _, v in present), default=1) or 1
+    y = 180
+    row_h = 92
+    for label, val in present[:7]:
+        draw.text((90, y), label, font=_font(38, bold=True), fill=PALETTE["text_white"])
+        # 바
+        bar_x = 480
+        bar_full = 900
+        _rr(draw, (bar_x, y + 12, bar_x + bar_full, y + 44), r=8, fill=PALETTE["grade_bar"])
+        filled = int(bar_full * val / max_val)
+        if filled > 0:
+            _rr(draw, (bar_x, y + 12, bar_x + filled, y + 44), r=8, fill=accent)
+        # 금액
+        draw.text((bar_x + bar_full + 30, y),
+                  f"{val:,.0f}만원/년", font=_font(34, bold=True), fill=PALETTE["accent_green"])
+        draw.text((bar_x + bar_full + 30, y + 44),
+                  f"월 {val/12:.1f}만원", font=_font(26), fill=PALETTE["text_dim"])
+        y += row_h
+
+    if not present:
+        draw.text((90, 220), "복리후생 공시 데이터 없음",
+                  font=_font(44), fill=PALETTE["text_dim"])
+
+    # 총액 + 교육훈련비 요약 박스 (하단)
+    total = welfare.get("total_per_person_10k", sum(v for _, v in present))
+    box_y = CANVAS_H - 180
+    _rr(draw, (60, box_y, CANVAS_W - 60, CANVAS_H - 50), r=20, fill=PALETTE["bg_card"])
+    if total:
+        draw.text((100, box_y + 30), "1인당 복리후생비 총액",
+                  font=_font(34), fill=PALETTE["text_gray"])
+        draw.text((100, box_y + 70), f"연 {total:,.0f}만원",
+                  font=_font(56, bold=True), fill=PALETTE["text_white"])
+    per_train = training.get("per_person_10k", 0)
+    if per_train:
+        draw.text((CANVAS_W - 720, box_y + 30), "1인당 교육훈련비",
+                  font=_font(34), fill=PALETTE["text_gray"])
+        draw.text((CANVAS_W - 720, box_y + 70), f"연 {per_train:,.0f}만원",
+                  font=_font(56, bold=True), fill=PALETTE["accent_gold"])
+
+    if output_path is None:
+        out_dir = os.path.join(OUTPUT_DIR, "welfare")
+        os.makedirs(out_dir, exist_ok=True)
+        output_path = os.path.join(out_dir, f"{company_name}_복지.png")
+    _save(img, output_path)
+    return output_path
+
+
+def make_benefit_card(
+    company_name: str,
+    leave: dict = None,          # welfare_parser.parse_leave_policy 결과
+    company_color: tuple = (64, 156, 255),
+    output_path: str = None,
+) -> str:
+    """
+    숨겨진 혜택 카드: 휴가/휴직 정책 + 제도 플래그(유연근무/재택/해외연수 등)
+    """
+    leave = leave or {}
+    img = Image.new("RGB", (CANVAS_W, CANVAS_H), PALETTE["bg_dark"])
+    draw = ImageDraw.Draw(img)
+    accent = company_color
+
+    draw.rectangle([0, 0, CANVAS_W, 6], fill=accent)
+    draw.text((60, 40), company_name, font=_font(40, bold=True), fill=accent)
+    draw.text((60, 95), "휴가 · 휴직 · 제도  (취업규칙 기준)",
+              font=_font(32), fill=PALETTE["text_dim"])
+
+    # 좌측: 숫자형 휴가 지표
+    metrics = []
+    if leave.get("annual_leave_max"):
+        metrics.append(("연차", f"최대 {leave['annual_leave_max']}일"))
+    if leave.get("summer_leave_days"):
+        metrics.append(("하계휴가", f"{leave['summer_leave_days']}일 (별도)"))
+    if leave.get("sick_paid_days"):
+        metrics.append(("유급병가", f"{leave['sick_paid_days']}일"))
+    if leave.get("parental_leave_months"):
+        metrics.append(("육아휴직", f"{leave['parental_leave_months']}개월"))
+    if leave.get("marriage_days"):
+        metrics.append(("결혼휴가", f"{leave['marriage_days']}일"))
+
+    y = 200
+    for label, val in metrics[:6]:
+        _rr(draw, (60, y, 880, y + 90), r=16, fill=PALETTE["bg_card"])
+        draw.text((90, y + 22), label, font=_font(38, bold=True), fill=PALETTE["text_gray"])
+        draw.text((480, y + 18), val, font=_font(44, bold=True), fill=PALETTE["accent_green"])
+        y += 110
+
+    # 우측: 제도 플래그 체크 그리드
+    flags = [
+        ("유연근무제",   "flexible_work"),
+        ("재택근무",     "remote_work"),
+        ("해외연수",     "overseas_training"),
+        ("어학연수",     "language_training"),
+        ("MBA·학위지원", "mba_support"),
+        ("학습휴직",     "study_leave"),
+        ("리프레시휴직", "career_break"),
+    ]
+    fx = 940
+    fy = 200
+    draw.text((fx, 150), "운영 제도", font=_font(34), fill=PALETTE["text_dim"])
+    for label, key in flags:
+        on = bool(leave.get(key))
+        mark = "✅" if on else "—"
+        color = PALETTE["accent_green"] if on else PALETTE["text_dim"]
+        _rr(draw, (fx, fy, CANVAS_W - 60, fy + 80), r=14,
+            fill=PALETTE["bg_card"] if on else PALETTE["bg_dark"],
+            outline=PALETTE["grade_bar"], width=1)
+        draw.text((fx + 30, fy + 18), label,
+                  font=_font(38, bold=on), fill=PALETTE["text_white"] if on else PALETTE["text_dim"])
+        draw.text((CANVAS_W - 130, fy + 14), mark, font=_font(40), fill=color)
+        fy += 95
+
+    if output_path is None:
+        out_dir = os.path.join(OUTPUT_DIR, "benefit")
+        os.makedirs(out_dir, exist_ok=True)
+        output_path = os.path.join(out_dir, f"{company_name}_혜택.png")
+    _save(img, output_path)
+    return output_path
+
+
+def make_location_card(
+    company_name: str,
+    location: dict = None,       # src.data.location.get_location_dict() 결과
+    company_color: tuple = (64, 156, 255),
+    output_path: str = None,
+) -> str:
+    """
+    근무지 카드: 본사 위치 + 지방이전 여부 + 순환/업무순환 강도
+    지방 취준생이 연봉만큼 중요하게 보는 정보.
+    """
+    location = location or {}
+    img = Image.new("RGB", (CANVAS_W, CANVAS_H), PALETTE["bg_dark"])
+    draw = ImageDraw.Draw(img)
+    accent = company_color
+
+    draw.rectangle([0, 0, CANVAS_W, 6], fill=accent)
+    draw.text((60, 40), company_name, font=_font(40, bold=True), fill=accent)
+    draw.text((60, 95), "근무지 · 지방이전 · 순환근무",
+              font=_font(32), fill=PALETTE["text_dim"])
+
+    # ── 본사 위치 (대형) ─────────────────────────────────────
+    y = 190
+    draw.text((90, y), "🏢 본사", font=_font(40), fill=PALETTE["text_gray"])
+    region = location.get("region", "")
+    draw.text((90, y + 55), region or "—",
+              font=_font(96, bold=True), fill=PALETTE["text_white"])
+    draw.text((90, y + 175), location.get("hq_address", ""),
+              font=_font(36), fill=PALETTE["text_gray"])
+
+    # ── 지방이전 배지 ────────────────────────────────────────
+    by = 470
+    relocated = location.get("relocated", False)
+    inno = location.get("innovation_city", "")
+    badge_color = PALETTE["accent_gold"] if relocated else PALETTE["grade_bar"]
+    badge_text = f"지방이전 완료 · {inno}" if relocated else "지방이전 비대상 (현 위치 유지)"
+    _rr(draw, (90, by, 90 + len(badge_text) * 24 + 60, by + 64), r=16, fill=badge_color)
+    draw.text((120, by + 14), badge_text, font=_font(34, bold=True),
+              fill=PALETTE["bg_dark"] if relocated else PALETTE["text_gray"])
+
+    # ── 순환근무 강도 ────────────────────────────────────────
+    ry = 600
+    rotation = location.get("rotation", "")
+    note = location.get("rotation_note", "")
+    scope = location.get("branch_scope", "")
+
+    _rr(draw, (60, ry, CANVAS_W - 60, CANVAS_H - 60), r=24, fill=PALETTE["bg_card"])
+    draw.text((100, ry + 30), "🔄 근무형태", font=_font(36), fill=PALETTE["text_gray"])
+
+    # 강도 시각화 (전국순환=3칸, 권역=2칸, 본사상주=1칸)
+    level = {"전국순환": 3, "권역순환": 2, "본사상주": 1}.get(rotation, 0)
+    draw.text((100, ry + 80), rotation or "정보 없음",
+              font=_font(72, bold=True),
+              fill=PALETTE["accent_green"] if level <= 1 else
+                   (PALETTE["accent_gold"] if level == 2 else (255, 120, 110)))
+
+    # 강도 인디케이터 (이사 빈도 ↑일수록 빨강)
+    ix = 100
+    iy = ry + 190
+    labels3 = ["적음", "보통", "잦음"]
+    for i in range(3):
+        on = i < level
+        col = [(110, 200, 130), (255, 196, 60), (255, 110, 100)][i]
+        _rr(draw, (ix, iy, ix + 220, iy + 50), r=12,
+            fill=col if on else PALETTE["grade_bar"])
+        draw.text((ix + 70, iy + 8), labels3[i], font=_font(30, bold=True),
+                  fill=PALETTE["bg_dark"] if on else PALETTE["text_dim"])
+        ix += 240
+    draw.text((100 + 720 + 40, iy + 8), "← 이사·전보 빈도",
+              font=_font(28), fill=PALETTE["text_dim"])
+
+    if note:
+        draw.text((100, ry + 270), f"· {note}",
+                  font=_font(34), fill=PALETTE["text_white"])
+    if scope:
+        draw.text((100, ry + 320), f"· {scope}",
+                  font=_font(34), fill=PALETTE["text_gray"])
+
+    if output_path is None:
+        out_dir = os.path.join(OUTPUT_DIR, "location")
+        os.makedirs(out_dir, exist_ok=True)
+        output_path = os.path.join(out_dir, f"{company_name}_근무지.png")
+    _save(img, output_path)
+    return output_path
+
+
 def make_company_profile_card(
     company_name: str,
     total_assets_100m: int = 0,      # 자산총계 (억원)

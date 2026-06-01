@@ -29,7 +29,7 @@ CAREER_GRADE_MAP = [
     (12, "3급"),
     (17, "2급"),
     (22, "1급"),
-    (27, "부장/처장급"),
+    (27, "부장·처장급"),
 ]
 
 
@@ -44,6 +44,8 @@ class CareerPoint:
     monthly_gross_10k: float    # 월 세전 (만원)
     monthly_net_10k: float      # 월 실수령 (만원)
     tax_rate_pct: float
+    insurance_10k: float = 0.0    # 월 4대보험 (만원)
+    income_tax_10k: float = 0.0   # 월 소득세+지방세 (만원)
 
 
 def build_career_table(
@@ -110,6 +112,8 @@ def build_career_table(
             monthly_gross_10k=net_info["monthly_gross_10k"],
             monthly_net_10k=net_info["monthly_net_10k"],
             tax_rate_pct=net_info["tax_rate_pct"],
+            insurance_10k=net_info["insurance_10k"],
+            income_tax_10k=net_info["income_tax_10k"],
         ))
 
     return results
@@ -135,10 +139,18 @@ def _lookup_hobong(grade_table: dict[int, int], hobong: int) -> int:
 
 
 def _fallback_grade(hobong_map: dict, target_grade: str) -> dict:
-    """직급 없을 때 숫자 순으로 인접 직급 탐색"""
+    """직급 없을 때 인접 직급 탐색"""
     grade_order = ["6급", "5급", "4급", "3급", "2급", "1급"]
-    idx = grade_order.index(target_grade) if target_grade in grade_order else -1
-    for offset in [1, -1, 2, -2]:
+    # 1급보다 상위(부장·처장급 등)는 가장 높은 직급(1급→2급…) 테이블을 사용해
+    # 연봉이 하위 직급으로 떨어지는 역전을 방지
+    if target_grade not in grade_order:
+        for g in reversed(grade_order):
+            if g in hobong_map:
+                return hobong_map[g]
+        return {}
+    idx = grade_order.index(target_grade)
+    # 상위 직급 우선(부장·처장 방향), 없으면 하위 직급
+    for offset in [-1, 1, -2, 2]:
         adj_idx = idx + offset
         if 0 <= adj_idx < len(grade_order):
             adj = grade_order[adj_idx]

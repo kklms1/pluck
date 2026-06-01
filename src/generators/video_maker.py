@@ -4,6 +4,7 @@
 씬 구성 (단일 기업 딥다이브):
   [인트로]    후킹 카드 (세전연봉 + 월 실수령)
   [기업규모]  자산총계/순위 + 블라인드 평점 카드
+  [근무지]    본사 위치 / 지방이전 / 순환근무 카드
   [섹션1]     연차별 연봉 카드 1~30년
   [섹션2]     복지·수당 섹션 카드 → 복지 카드
   [섹션3]     숨겨진 혜택 섹션 카드 → 혜택 카드
@@ -24,9 +25,11 @@ def make_video(
     company_name: str,
     card_sequences: dict,          # make_card_sequence() 반환값
     profile_card_path: Optional[str] = None,  # 기업규모/블라인드 카드
+    location_card_path: Optional[str] = None,  # 근무지/지방이전/순환근무 카드
     welfare_card_paths: list[str] = None,
     benefit_card_paths: list[str] = None,
     bgm_path: Optional[str] = None,
+    narration_path: Optional[str] = None,  # TTS 내레이션 mp3 (있으면 메인 오디오)
     hook_duration: float = 5.0,    # 후킹 카드 표시 시간
     profile_duration: float = 6.0, # 기업 규모 카드 표시 시간
     card_duration: float = 3.0,    # 연차 카드 1장 시간 (30장 × 3초 = 90초)
@@ -36,10 +39,11 @@ def make_video(
     try:
         from moviepy.editor import (
             ImageClip, concatenate_videoclips, AudioFileClip,
-            ColorClip, CompositeVideoClip,
+            ColorClip, CompositeVideoClip, CompositeAudioClip,
         )
         from moviepy.video.fx.fadein import fadein
         from moviepy.video.fx.fadeout import fadeout
+        from moviepy.audio.fx.volumex import volumex
     except ImportError:
         logger.error("moviepy 미설치: pip install moviepy")
         return None
@@ -70,6 +74,11 @@ def make_video(
     if profile_card_path:
         add_black(0.4)
         add_image(profile_card_path, profile_duration, fade_in=True)
+
+    # ── [근무지] 본사 위치/지방이전/순환근무 카드 ─────────
+    if location_card_path:
+        add_black(0.4)
+        add_image(location_card_path, profile_duration, fade_in=True)
 
     # ── [섹션1] 연차별 연봉 카드 1~30년차 ───────────────
     add_black(0.3)
@@ -115,14 +124,35 @@ def make_video(
 
     final = concatenate_videoclips(clips, method="compose")
 
-    # BGM
+    # ── 오디오: 내레이션(메인) + BGM(저음량 배경) ────────────
+    audio_tracks = []
+    narration = None
+    if narration_path and os.path.exists(narration_path):
+        try:
+            narration = AudioFileClip(narration_path)
+            audio_tracks.append(narration)
+        except Exception as e:
+            logger.warning(f"내레이션 로드 실패: {e}")
+            narration = None
+
     if bgm_path and os.path.exists(bgm_path):
         try:
-            audio = AudioFileClip(bgm_path).subclip(0, final.duration)
-            audio = audio.audio_fadeout(3)
-            final = final.set_audio(audio)
+            bgm = AudioFileClip(bgm_path).subclip(0, final.duration)
+            bgm = bgm.audio_fadeout(3)
+            # 내레이션이 있으면 BGM은 배경으로 깔아 음량을 낮춤
+            if narration is not None:
+                bgm = volumex(bgm, 0.18)
+            audio_tracks.append(bgm)
         except Exception as e:
             logger.warning(f"BGM 실패: {e}")
+
+    if audio_tracks:
+        mixed = (audio_tracks[0] if len(audio_tracks) == 1
+                 else CompositeAudioClip(audio_tracks))
+        try:
+            final = final.set_audio(mixed.subclip(0, final.duration))
+        except Exception:
+            final = final.set_audio(mixed)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     if not output_path:
