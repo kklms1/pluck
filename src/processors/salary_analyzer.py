@@ -142,7 +142,11 @@ def estimate_career_salary(
             year=year,
             grade=grade_name,
             annual_gross_10k=adjusted,
-            **net_info,
+            monthly_gross_10k=net_info["monthly_gross_10k"],
+            monthly_net_10k=net_info["monthly_net_10k"],
+            insurance_10k=net_info["insurance_10k"],
+            income_tax_10k=net_info["income_tax_10k"],
+            tax_rate_pct=net_info["tax_rate_pct"],
         ))
 
     return results
