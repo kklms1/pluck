@@ -1,170 +1,154 @@
-"""Pluck — CLI entry point.
-
-Examples:
-    python main.py --gui
-    python main.py --url "https://example.com/products" --engine local
-    python main.py --url "..." --engine claude --api-key sk-ant-...
-    python main.py --url "..." --engine gemini --api-key ...
-    python main.py --url "..." --engine ollama --model llava:7b
-    python main.py --url "..." -i "extract size, color, material"
-    python main.py --mint-key PRO --days 365
-    python main.py --activate PRO-2027...
 """
-from __future__ import annotations
+공기업 유튜브 자동화 파이프라인
+사용법:
+  python main.py --company "한국전력공사"
+  python main.py --auto            # 공취사 최근 공고 기업 전체 자동화
+  python main.py --list            # 처리 가능 기업 목록 확인
+"""
 
 import argparse
 import logging
-import os
 import sys
-from pathlib import Path
+import os
 
-from dotenv import load_dotenv
+sys.path.insert(0, os.path.dirname(__file__))
 
-from extractor import PluckExtractor
-from subscription import (
-    LicenseManager,
-    Plan,
-    UsageTracker,
-    can_extract,
-    clamp_max_products,
-    generate_key,
-    plan_info,
+from src.db import init_db, upsert_company, save_salary_records, save_career_salary
+from src.db import save_evaluator_stat, log_video, get_latest_salary
+from src.crawlers.allio import AllioCrawler
+from src.crawlers.gongchwi import GongchwaCrawler
+from src.crawlers.blind import BlindCrawler
+from src.processors.salary_analyzer import estimate_career_salary, format_salary_table
+from src.processors.evaluator_analyzer import analyze_evaluator_activity
+from src.generators.card_maker import make_card_sequence
+from src.generators.video_maker import make_video
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
 )
-
-load_dotenv()
-
-
-def _print_progress(msg: str) -> None:
-    print(f"[*] {msg}", flush=True)
+logger = logging.getLogger("pipeline")
 
 
-ENGINE_ENV_KEY = {
-    "claude": "ANTHROPIC_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "gemini": "GEMINI_API_KEY",
-}
+def run_pipeline(company_name: str, make_video_flag: bool = True):
+    logger.info(f"=== [{company_name}] 파이프라인 시작 ===")
 
+    # 1. 알리오 데이터 수집
+    logger.info("① 알리오 연봉 데이터 수집...")
+    allio = AllioCrawler()
+    allio_data = allio.collect(company_name)
+    inst_code = allio_data.get("inst_code")
 
-def cli() -> int:
-    parser = argparse.ArgumentParser(
-        description="Pluck — AI-powered product scraper for any shopping page",
+    upsert_company(company_name, inst_code)
+
+    if allio_data["salary"]:
+        save_salary_records(allio_data["salary"])
+        logger.info(f"   연봉 {len(allio_data['salary'])}건 저장")
+    else:
+        logger.warning("   알리오 데이터 없음 — 기본값으로 추정")
+
+    # 2. 연차별 연봉 추정
+    logger.info("② 연차별 연봉 테이블 생성...")
+    latest = get_latest_salary(company_name)
+    if latest:
+        avg_salary = latest["avg_salary_10k"]
+        avg_tenure = latest["avg_tenure_years"]
+    else:
+        avg_salary = 5000
+        avg_tenure = 10.0
+
+    career_salary = estimate_career_salary(avg_salary, avg_tenure)
+    save_career_salary(company_name, career_salary)
+
+    table = format_salary_table(career_salary)
+    print(f"\n{'─'*60}")
+    print(f"  {company_name} 연차별 연봉 추정")
+    print(f"{'─'*60}")
+    for row in table:
+        print(f"  {row['연차']:6s} | {row['직급']:6s} | 연봉 {row['세전연봉']:10s} | 실수령 {row['실수령액']}")
+    print(f"{'─'*60}\n")
+
+    # 3. 평가위원 활동률 분석
+    logger.info("③ 평가위원 활동률 분석...")
+    eval_stat = analyze_evaluator_activity(company_name, inst_code)
+    save_evaluator_stat(eval_stat)
+    logger.info(f"   성장점수: {eval_stat.growth_score}/10 — {eval_stat.interpretation}")
+
+    # 4. 블라인드 수집 (선택)
+    logger.info("④ 블라인드 리뷰 수집 (Playwright 필요)...")
+    blind = BlindCrawler()
+    blind_result = blind.collect(company_name)
+    if blind_result:
+        from src.db import save_blind_summary
+        save_blind_summary(blind_result)
+        logger.info(f"   블라인드 평점: {blind_result['avg_rating']}, 리뷰 {blind_result['review_count']}건")
+    else:
+        logger.info("   블라인드 수집 건너뜀 (계정 or 설치 필요)")
+
+    # 5. 카드 이미지 생성
+    logger.info("⑤ 카드 이미지 생성...")
+    card_paths = make_card_sequence(
+        company_name=company_name,
+        salary_list=[s.__dict__ for s in career_salary],
+        company_color=(64, 156, 255),
     )
-    parser.add_argument("--url", help="Shopping page URL to extract")
-    parser.add_argument("--max-products", type=int, default=20)
-    parser.add_argument("--output", default="output")
-    parser.add_argument("--no-headless", action="store_true", help="Show browser window")
-    parser.add_argument(
-        "--engine",
-        default="local",
-        choices=["local", "claude", "openai", "gemini", "ollama"],
-        help="AI engine. 'local' runs fully on-device with no API key.",
-    )
-    parser.add_argument("--model", default=None, help="Override default model for the engine")
-    parser.add_argument(
-        "--api-key", default=None,
-        help="API key for cloud engines (or use the engine's env var)",
-    )
-    parser.add_argument(
-        "--instructions", "-i", default=None,
-        help="Extra instructions for the LLM (e.g. 'extract size, color, material')",
-    )
-    parser.add_argument("--gui", action="store_true", help="Launch GUI")
+    logger.info(f"   카드 {len(card_paths)}장 생성")
 
-    parser.add_argument("--mint-key", choices=["PRO", "TEAM"])
-    parser.add_argument("--days", type=int, default=365)
-    parser.add_argument("--activate", metavar="KEY")
-    parser.add_argument("--plan-status", action="store_true")
+    # 6. 영상 조립
+    if make_video_flag and card_paths:
+        logger.info("⑥ 영상 조립...")
+        bgm_path = os.path.join("assets", "bgm", "epic_bgm.mp3")
+        video_path = make_video(
+            company_name=company_name,
+            card_image_paths=card_paths,
+            bgm_path=bgm_path if os.path.exists(bgm_path) else None,
+        )
+        if video_path:
+            log_video(company_name, video_path, len(card_paths))
+            logger.info(f"   영상 저장: {video_path}")
+    else:
+        logger.info("⑥ 영상 생성 건너뜀 (--no-video 옵션)")
 
+    logger.info(f"=== [{company_name}] 완료 ===\n")
+
+
+def run_auto_pipeline(pages: int = 3):
+    """공취사 최근 공고 기업 자동 수집 후 파이프라인 실행"""
+    logger.info("공취사 최근 채용공고 수집 중...")
+    crawler = GongchwaCrawler()
+    company_names = crawler.get_company_names(pages=pages)
+    logger.info(f"수집된 기업: {len(company_names)}개")
+
+    for name in company_names:
+        try:
+            run_pipeline(name, make_video_flag=False)
+        except Exception as e:
+            logger.error(f"{name} 파이프라인 실패: {e}")
+            continue
+
+
+def main():
+    init_db()
+
+    parser = argparse.ArgumentParser(description="공기업 유튜브 자동화 파이프라인")
+    parser.add_argument("--company", "-c", type=str, help="기업명 (예: 한국전력공사)")
+    parser.add_argument("--auto", "-a", action="store_true", help="공취사 최근 공고 전체 자동 처리")
+    parser.add_argument("--no-video", action="store_true", help="영상 생성 건너뜀 (카드만)")
+    parser.add_argument("--pages", type=int, default=3, help="공취사 크롤링 페이지 수")
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s | %(message)s",
-        datefmt="%H:%M:%S",
-    )
-
-    if args.mint_key:
-        key = generate_key(Plan(args.mint_key), days=args.days)
-        print(key)
-        return 0
-
-    if args.activate:
-        mgr = LicenseManager()
-        lic = mgr.activate(args.activate)
-        if not lic:
-            print("[!] Invalid or expired license key.", file=sys.stderr)
-            return 2
-        print(f"[*] Activated {plan_info(lic.plan)['label']} — expires {lic.expires_at}")
-        return 0
-
-    if args.plan_status:
-        mgr = LicenseManager()
-        lic = mgr.load()
-        used = UsageTracker().today()
-        info = plan_info(lic.plan)
-        limit = info["daily_limit"]
-        usage = f"{used}/{limit}" if limit is not None else f"{used} (unlimited)"
-        print(f"Plan       : {info['label']}")
-        print(f"Expires    : {lic.expires_at}")
-        print(f"Usage today: {usage}")
-        return 0
-
-    if args.gui:
-        from gui import launch_gui
-        launch_gui()
-        return 0
-
-    if not args.url:
-        parser.error("--url or --gui is required")
-
-    mgr = LicenseManager()
-    lic = mgr.load()
-    usage = UsageTracker()
-    ok, reason = can_extract(lic.plan, usage.today())
-    if not ok:
-        print(f"[!] {reason}", file=sys.stderr)
-        print("    Use --mint-key PRO to generate a demo Pro key, then --activate <key>.",
-              file=sys.stderr)
-        return 3
-
-    info = plan_info(lic.plan)
-    requested = args.max_products
-    capped = clamp_max_products(lic.plan, requested)
-    if capped < requested:
-        print(f"[*] Capped to {capped} products ({info['label']} plan limit).")
-
-    instructions = args.instructions
-    if instructions and not info["custom_instructions"]:
-        print("[!] Custom instructions require Pro or Team. Ignoring --instructions.",
-              file=sys.stderr)
-        instructions = None
-
-    api_key = args.api_key
-    if args.engine in ENGINE_ENV_KEY and not api_key:
-        api_key = os.getenv(ENGINE_ENV_KEY[args.engine])
-        if not api_key:
-            print(
-                f"[!] {ENGINE_ENV_KEY[args.engine]} is not set. "
-                "Pass --api-key or use --engine local for free local extraction.",
-                file=sys.stderr,
-            )
-            return 2
-
-    extractor = PluckExtractor(
-        output_dir=Path(args.output),
-        max_products=capped,
-        headless=not args.no_headless,
-        engine=args.engine,
-        api_key=api_key,
-        model=args.model,
-        progress_cb=_print_progress,
-        custom_instructions=instructions,
-    )
-    result = extractor.run_sync(args.url)
-    usage.increment()
-    print(f"\nExtracted {len(result.products)} product(s) → {result.output_dir}")
-    return 0
+    if args.company:
+        run_pipeline(args.company, make_video_flag=not args.no_video)
+    elif args.auto:
+        run_auto_pipeline(pages=args.pages)
+    else:
+        parser.print_help()
+        print("\n예시:")
+        print("  python main.py --company '한국전력공사'")
+        print("  python main.py --company '한국수자원공사' --no-video")
+        print("  python main.py --auto --pages 5")
 
 
 if __name__ == "__main__":
-    raise SystemExit(cli())
+    main()

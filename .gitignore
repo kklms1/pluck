@@ -40,16 +40,15 @@ wheels/
 .coverage
 htmlcov/
 
-# App output
-output/
-results.json
-results.csv
-*.png
-*.jpg
+# 데이터/출력물
+data/pipeline.db
+output/images/
+output/videos/
+logs/
 
-# License files (local only)
-~/.shopping-extractor/
-~/.pluck/
+# 에셋 (용량 큰 바이너리)
+assets/fonts/*.ttf
+assets/bgm/*.mp3
 
 # Playwright browser
 .browsers/
