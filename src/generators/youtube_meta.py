@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "../../output/meta")
 
-# 판매 링크 (실제 스토어 URL로 교체)
-SELF_INTRO_URL = "https://example.com/jaso"      # 자기소개서 기출 분석 PDF
-EXAM_BOOK_URL = "https://example.com/gichul"      # NCS+직무 기출변형 문제집
+# 판매 링크 — 환경변수로 주입하거나 아래 직접 교체
+# 스마트스토어: https://smartstore.naver.com/{스토어명}/products/{상품번호}
+SELF_INTRO_URL = os.environ.get("JASO_URL", "링크 준비 중 (설명란 참고)")
+EXAM_BOOK_URL  = os.environ.get("GICHUL_URL", "링크 준비 중 (설명란 참고)")
 
 
 def _won(man: float) -> str:

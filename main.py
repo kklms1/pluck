@@ -137,6 +137,23 @@ def generate(company_name: str, analysis: dict, blind: dict = None,
 
     narration = synthesize_tts(script)  # edge-tts 미설치/차단 시 None
     out["narration"] = narration
+    if narration:
+        import shutil, pathlib
+        remotion_audio = pathlib.Path(__file__).parent / "remotion/public/narration.mp3"
+        shutil.copy(narration, remotion_audio)
+        logger.info(f"   내레이션 → Remotion: {remotion_audio}")
+
+    # ── Remotion props.json 생성 ──────────────────────────────
+    logger.info("④-b Remotion props.json 생성...")
+    try:
+        from src.generators.remotion_export import build_props, write_props, rgb_to_hex
+        brand_hex = rgb_to_hex(color)
+        props_dict = build_props(company_name, career_points, analysis, b or {}, brand_hex)
+        props_path = write_props(props_dict)
+        out["remotion_props"] = props_path
+        logger.info(f"   props.json → {props_path}")
+    except Exception as e:
+        logger.warning(f"   remotion_export 실패: {e}")
 
     # ── 챕터 타임라인 → 메타데이터 ────────────────────────────
     logger.info("⑤ 유튜브 메타데이터...")

@@ -1,111 +1,144 @@
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { PALETTE, W, hexA } from "../theme";
+import { AbsoluteFill, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { PALETTE, W } from "../theme";
 import { DeepDiveProps, CareerPoint, comma } from "../lib/format";
 import { ensureFonts } from "../load-fonts";
 
 /**
- * 시그니처 후보 #1 — "통장 입금 알림"
- * 매 연차 실수령을 은행 푸시 알림 UI로 보여주는 우리만의 각인 장치.
- * 1년차 → 중간 → 30년차 알림이 순차로 쌓이며 성장 체감.
+ * 시그니처 씬 — "성장 급여 기록"
+ * 1년차 / 15년차 / 30년차 세 시점을 플랫 카드로 병렬 비교.
+ * 글라스모피즘 없음 — 단색 다크 배경 + 플랫 카드.
  */
-const won = (man: number) => comma(man * 10000);
 
 export const BankAlert: React.FC<DeepDiveProps> = (props) => {
   ensureFonts();
   const career = props.career || [];
   const pick = (y: number) =>
-    career.find((p) => p.career_year === y) || career[Math.min(y, career.length - 1)];
+    career.find((p) => p.career_year === y) || career[Math.min(y - 1, career.length - 1)];
   const picks = [pick(1), pick(15), pick(30)].filter(Boolean) as CareerPoint[];
 
   return (
-    <AbsoluteFill
-      style={{
-        background:
-          `radial-gradient(900px 600px at 50% 0%, ${hexA(props.brandColor, 0.35)} 0%, rgba(0,0,0,0) 55%),` +
-          " linear-gradient(180deg,#04060c 0%,#0b1224 100%)",
-        fontFamily: "Pretendard, sans-serif",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      {/* 상단 잠금화면 시계 느낌 */}
-      <div style={{ position: "absolute", top: 70, width: "100%", textAlign: "center", color: "#fff", opacity: 0.85 }}>
-        <div style={{ fontSize: 40, fontWeight: W.semibold, letterSpacing: 2 }}>오전 9:30</div>
-        <div style={{ fontSize: 26, color: PALETTE.gray, marginTop: 4 }}>매월 25일 · 급여일</div>
+    <AbsoluteFill style={{
+      background: PALETTE.ink,
+      fontFamily: "Pretendard, sans-serif",
+    }}>
+      {/* 브랜드 세로막대 */}
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 10, background: props.brandColor }} />
+
+      {/* 헤더 */}
+      <div style={{
+        position: "absolute", top: 60, left: 70, right: 70,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+      }}>
+        <div style={{ fontSize: 38, fontWeight: W.bold, color: props.brandColor, letterSpacing: 3 }}>
+          {props.company} — 급여 성장 기록
+        </div>
+        <div style={{ fontSize: 26, color: PALETTE.gray }}>매월 25일 · 급여일</div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 26, width: 980 }}>
+      {/* 카드 행 */}
+      <div style={{
+        position: "absolute",
+        left: 70, right: 70, top: 148, bottom: 70,
+        display: "flex",
+        gap: 28,
+      }}>
         {picks.map((p, i) => (
-          <NotiCard key={p.career_year} point={p} brand={props.brandColor} company={props.company} index={i} />
+          <PayCard key={p.career_year} point={p} brand={props.brandColor} company={props.company} index={i} />
         ))}
       </div>
 
-      {/* 시그니처 워터마크 */}
-      <div style={{ position: "absolute", bottom: 50, right: 64, fontSize: 26, fontWeight: W.bold, color: hexA("#fff", 0.5) }}>
-        급여 알림 · 공기업 딥다이브
+      {/* 워터마크 */}
+      <div style={{
+        position: "absolute", bottom: 26, right: 70,
+        fontSize: 22, color: "#333", letterSpacing: 1,
+      }}>
+        알리오 보수규정 기준 · 공기업 딥다이브
       </div>
     </AbsoluteFill>
   );
 };
 
-const NotiCard: React.FC<{ point: CareerPoint; brand: string; company: string; index: number }> = ({
-  point,
-  brand,
-  company,
-  index,
+const PayCard: React.FC<{ point: CareerPoint; brand: string; company: string; index: number }> = ({
+  point, brand, company, index,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const start = index * 16;
-  const s = spring({ frame: frame - start, fps, config: { damping: 200 }, durationInFrames: 16 });
+  const start = index * 18;
+  const s = spring({ frame: frame - start, fps, config: { damping: 200 }, durationInFrames: 18 });
   const net = point.monthly_net_10k;
+  const isFirst = index === 0;
+  const isLast = index === 2;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 26,
-        padding: "26px 32px",
-        borderRadius: 28,
-        background: "rgba(255,255,255,0.93)",
-        boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
-        transform: `translateY(${(1 - s) * 40}px) scale(${0.96 + s * 0.04})`,
-        opacity: s,
-        backdropFilter: "blur(20px)",
-      }}
-    >
-      {/* 앱 아이콘 */}
-      <div
-        style={{
-          width: 88,
-          height: 88,
-          borderRadius: 22,
-          background: `linear-gradient(145deg, ${brand}, ${hexA(brand, 0.7)})`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#fff",
-          fontSize: 46,
-          fontWeight: W.black,
-          flexShrink: 0,
-        }}
-      >
-        ₩
+    <div style={{
+      flex: 1,
+      background: "#1a1a1a",
+      borderRadius: 14,
+      padding: "36px 32px",
+      borderTop: `5px solid ${isFirst ? "#444" : isLast ? PALETTE.warmGold : brand}`,
+      transform: `translateY(${(1 - s) * 40}px)`,
+      opacity: s,
+      display: "flex",
+      flexDirection: "column",
+    }}>
+      {/* 연차 배지 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <div style={{
+          padding: "6px 16px",
+          borderRadius: 5,
+          background: isLast ? PALETTE.warmGold : isFirst ? "#333" : brand,
+          fontSize: 24,
+          fontWeight: W.bold,
+          color: isLast ? "#111" : "#fff",
+        }}>
+          {point.career_year}년차
+        </div>
+        <div style={{ fontSize: 24, color: PALETTE.gray }}>{point.grade}</div>
       </div>
 
-      <div style={{ flex: 1, color: "#111" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 28, fontWeight: W.bold, color: "#6b7280" }}>급여통장</div>
-          <div style={{ fontSize: 24, color: "#9ca3af" }}>지금</div>
+      {/* 월 실수령 */}
+      <div style={{ marginBottom: 6 }}>
+        <div style={{ fontSize: 22, color: PALETTE.gray, marginBottom: 4 }}>월 실수령</div>
+        <div style={{ fontSize: 56, fontWeight: W.black, color: PALETTE.white, letterSpacing: -2, lineHeight: 1 }}>
+          {Math.round(net)}
+          <span style={{ fontSize: 28, fontWeight: W.semibold, color: PALETTE.gray }}> 만원</span>
         </div>
-        <div style={{ fontSize: 30, fontWeight: W.semibold, color: "#374151", marginTop: 6 }}>
-          입금 <span style={{ color: brand, fontWeight: W.extrabold }}>{won(net)}원</span>
-        </div>
-        <div style={{ fontSize: 26, color: "#9ca3af", marginTop: 6 }}>
-          {company} · {point.grade} {point.career_year}년차 · 월 실수령
-        </div>
+      </div>
+
+      {/* 구분선 */}
+      <div style={{ height: 1, background: "#2a2a2a", margin: "20px 0" }} />
+
+      {/* 세부 명세 */}
+      <MiniRow label="월 세전" value={`${Math.round(point.monthly_gross_10k)}만`} />
+      <MiniRow label="세전 연봉" value={`${Math.round(point.annual_gross_10k).toLocaleString()}만`} accent />
+      {(point.monthly_regular_net_10k || 0) > 0 && (
+        <MiniRow label="평달 실수령" value={`${Math.round(point.monthly_regular_net_10k!)}만`} />
+      )}
+
+      {/* 입금 완료 바 */}
+      <div style={{
+        marginTop: "auto",
+        paddingTop: 20,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        fontSize: 22,
+        color: "#444",
+      }}>
+        <div style={{
+          width: 8, height: 8, borderRadius: "50%",
+          background: isLast ? PALETTE.warmGold : brand,
+          flexShrink: 0,
+        }} />
+        {company} 급여통장 입금 완료
       </div>
     </div>
   );
 };
+
+const MiniRow: React.FC<{ label: string; value: string; accent?: boolean }> = ({ label, value, accent }) => (
+  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 26, marginBottom: 10 }}>
+    <span style={{ color: PALETTE.gray }}>{label}</span>
+    <span style={{ fontWeight: W.bold, color: accent ? PALETTE.warmGold : PALETTE.white }}>{value}</span>
+  </div>
+);

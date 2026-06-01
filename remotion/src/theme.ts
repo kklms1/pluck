@@ -46,9 +46,4 @@ export function hexA(hex: string, a: number) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-export function bgGradient(brand: string) {
-  return `radial-gradient(1200px 700px at 78% 12%, ${hexA(
-    brand,
-    0.18
-  )} 0%, rgba(0,0,0,0) 60%), linear-gradient(160deg, ${PALETTE.bgTop} 0%, ${PALETTE.bgBottom} 100%)`;
-}
+// bgGradient 제거됨 — 모든 씬이 PALETTE.ink 단색 배경 사용
