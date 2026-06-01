@@ -156,6 +156,10 @@ async def crawl_company(
         disclosures = await _collect_disclosures(page, inst_code, company_name)
         result["disclosures"] = disclosures
 
+        # 자산규모/순위
+        logger.info("  자산규모 수집...")
+        result["asset_info"] = await _collect_asset_info(page, inst_code, company_name)
+
         # 내부공시 규정 파일 다운로드
         if download_regulations and apba_id:
             logger.info("  내부규정 파일 수집...")
@@ -183,6 +187,7 @@ async def _collect_disclosures(page, inst_code: str, company_name: str) -> dict:
         "교육훈련비":    DISCLOSURE["교육훈련비"],
         "노동조합":      DISCLOSURE["노동조합"],
         "신규채용":      DISCLOSURE["신규채용"],
+        "재무현황":      "/alio/site/main/publicinstitutions/financialInfo.do",
     }
 
     for cat, path in categories.items():
@@ -344,6 +349,62 @@ def _detect_ext(s: str) -> str:
         if ext in s:
             return ext
     return ""
+
+
+async def _collect_asset_info(page, inst_code: str, company_name: str) -> dict:
+    """
+    재무공시 → 자산총계 + 공공기관 내 자산 순위 추출
+    알리오 재무현황 페이지 또는 기관 기본정보에서 수집
+    """
+    result = {
+        "total_assets_100m": 0,   # 자산총계 (억원)
+        "asset_rank": 0,          # 공공기관 자산 순위
+        "revenue_100m": 0,        # 영업수익 (억원)
+        "year": 0,
+    }
+
+    urls = [
+        f"{BASE}/alio/site/main/publicinstitutions/financialInfo.do?instCode={inst_code}",
+        f"{BASE}/alio/site/main/publicinstitutions/publicInstDetail.do?instCode={inst_code}",
+    ]
+
+    for url in urls:
+        try:
+            await page.goto(url, wait_until="networkidle", timeout=20000)
+            await _human_delay(1.0, 1.5)
+            tables = await _extract_all_tables(page)
+
+            for table in tables:
+                for row in table:
+                    row_text = " ".join(row)
+                    # 자산총계 패턴: "자산총계 ... 숫자"
+                    if "자산총계" in row_text or "자산 총계" in row_text:
+                        for cell in row:
+                            m = re.search(r"[\d,]+", cell.replace(",", ""))
+                            if m:
+                                val = int(m.group().replace(",", ""))
+                                if val > 1000:  # 억원 단위
+                                    result["total_assets_100m"] = val
+                                    break
+                    if "영업수익" in row_text or "매출액" in row_text:
+                        for cell in row:
+                            m = re.search(r"[\d,]+", cell)
+                            if m:
+                                val = int(m.group().replace(",", ""))
+                                if val > 100:
+                                    result["revenue_100m"] = val
+                                    break
+                    # 연도 추출
+                    year_m = re.search(r"20\d{2}", row_text)
+                    if year_m and not result["year"]:
+                        result["year"] = int(year_m.group())
+
+            if result["total_assets_100m"] > 0:
+                break
+        except Exception as e:
+            logger.debug(f"자산 수집 실패 {url}: {e}")
+
+    return result
 
 
 # ─────────────────────────────────────────────────────────────

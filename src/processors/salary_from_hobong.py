@@ -20,7 +20,7 @@ DEFAULT_START_HOBONG = {
     "6급": 1,   # 신입 1호봉 시작
 }
 
-# 연차별 직급 이동 패턴 (일반 공기업 대졸 공채)
+# 연차별 직급 이동 패턴 (일반 공기업 대졸 공채, 30년까지)
 # (최소 연차, 직급)
 CAREER_GRADE_MAP = [
     (1,  "6급"),
@@ -29,6 +29,7 @@ CAREER_GRADE_MAP = [
     (12, "3급"),
     (17, "2급"),
     (22, "1급"),
+    (27, "부장/처장급"),
 ]
 
 
@@ -40,6 +41,7 @@ class CareerPoint:
     base_salary_10k: int        # 기본급 (만원)
     total_allowance_10k: float  # 수당 합계 (만원/월)
     annual_gross_10k: int       # 세전 연봉 (만원)
+    monthly_gross_10k: float    # 월 세전 (만원)
     monthly_net_10k: float      # 월 실수령 (만원)
     tax_rate_pct: float
 
@@ -105,6 +107,7 @@ def build_career_table(
             base_salary_10k=base,
             total_allowance_10k=fixed_monthly + ratio_monthly,
             annual_gross_10k=annual_gross,
+            monthly_gross_10k=net_info["monthly_gross_10k"],
             monthly_net_10k=net_info["monthly_net_10k"],
             tax_rate_pct=net_info["tax_rate_pct"],
         ))
@@ -145,9 +148,8 @@ def _fallback_grade(hobong_map: dict, target_grade: str) -> dict:
 
 
 def _key_years(max_years: int) -> list[int]:
-    """출력할 연차 목록 (영상용 하이라이트 포인트)"""
-    years = [1, 3, 5, 7, 10, 12, 15, 17, 20, 22, 25]
-    return [y for y in years if y <= max_years]
+    """1년차부터 max_years까지 1년 단위 전체 목록"""
+    return list(range(1, max_years + 1))
 
 
 def format_career_table(points: list[CareerPoint]) -> list[dict]:
@@ -158,7 +160,7 @@ def format_career_table(points: list[CareerPoint]) -> list[dict]:
             "호봉":     f"{p.hobong}호봉",
             "기본급":   f"{p.base_salary_10k:,}만원",
             "세전연봉": f"{p.annual_gross_10k:,}만원",
-            "월세전":   f"{p.annual_gross_10k/12:.0f}만원",
+            "월세전":   f"{p.monthly_gross_10k:.0f}만원",
             "실수령":   f"{p.monthly_net_10k:.0f}만원",
             "공제율":   f"{p.tax_rate_pct:.1f}%",
         }
