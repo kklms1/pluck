@@ -53,3 +53,9 @@ assets/bgm/*.mp3
 
 # Playwright browser
 .browsers/
+
+# Remotion
+remotion/node_modules/
+remotion/out/
+remotion/public/fonts/*.woff2
+remotion/.remotion/
