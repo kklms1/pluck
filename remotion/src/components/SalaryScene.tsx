@@ -61,7 +61,7 @@ export const SalaryScene: React.FC<{
           height: 880,
           background: "#ffffff",
           borderRadius: 18,
-          boxShadow: `0 0 80px ${PALETTE.netGlow}`,
+          boxShadow: "0 8px 40px rgba(0,0,0,0.35)",
           color: "#1a1a1a",
           padding: "44px 54px",
           opacity: enter,
@@ -148,6 +148,7 @@ export const SalaryScene: React.FC<{
         {/* 평달 실수령액 (핑크 강조) */}
         <div
           style={{
+            position: "relative",
             display: "flex",
             alignItems: "center",
             marginTop: 18,
@@ -160,6 +161,22 @@ export const SalaryScene: React.FC<{
           <div style={{ fontSize: 46, fontWeight: W.black, color: brandColor }}>
             {manToWon(regularNet * t)} <span style={{ fontSize: 26 }}>원</span>
           </div>
+
+          {/* 손으로 그린 빨간 동그라미 — 45프레임 이후 서서히 등장 */}
+          <svg
+            style={{ position: "absolute", right: 12, top: -12, width: 400, height: 90, overflow: "visible", pointerEvents: "none" }}
+            viewBox="0 0 400 90"
+          >
+            <path
+              d="M 30,45 Q 50,6 200,4 Q 355,2 378,45 Q 358,84 200,86 Q 48,88 30,45"
+              fill="none"
+              stroke="#e53e3e"
+              strokeWidth="4.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={interpolate(frame, [42, 54], [0, 0.85], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}
+            />
+          </svg>
         </div>
       </div>
 

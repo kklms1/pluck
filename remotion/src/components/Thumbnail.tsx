@@ -1,12 +1,8 @@
 import { AbsoluteFill } from "remotion";
-import { PALETTE, W, bgGradient, hexA } from "../theme";
+import { PALETTE, W } from "../theme";
 import { DeepDiveProps, won, comma } from "../lib/format";
 import { ensureFonts } from "../load-fonts";
 
-/**
- * 메인 썸네일 (1280x720)
- * 후킹: "신입 실수령 XXX만 → 30년차 X.X억" + 호기심 갭
- */
 export const Thumbnail: React.FC<DeepDiveProps> = (props) => {
   ensureFonts();
   const { company, brandColor, career } = props;
@@ -18,131 +14,162 @@ export const Thumbnail: React.FC<DeepDiveProps> = (props) => {
   return (
     <AbsoluteFill
       style={{
-        background: bgGradient(brandColor),
+        background: PALETTE.ink,
         fontFamily: "Pretendard, sans-serif",
         color: PALETTE.white,
         overflow: "hidden",
       }}
     >
-      {/* 배경 초대형 워터마크 숫자 */}
-      <div
-        style={{
-          position: "absolute",
-          right: -60,
-          top: -40,
-          fontSize: 620,
-          fontWeight: W.black,
-          color: hexA(brandColor, 0.1),
-          lineHeight: 1,
-          letterSpacing: -20,
-        }}
-      >
-        ₩
-      </div>
+      {/* 좌측 브랜드 컬러 세로 막대 (편집자가 Premiere에서 넣은 느낌) */}
+      <div style={{
+        position: "absolute",
+        left: 0, top: 0, bottom: 0,
+        width: 10,
+        background: brandColor,
+      }} />
 
-      {/* 상단: 기업 배지 + 에브로우 */}
-      <div style={{ position: "absolute", top: 54, left: 64, display: "flex", alignItems: "center", gap: 18 }}>
-        <div
-          style={{
-            padding: "12px 26px",
-            borderRadius: 999,
-            border: `2px solid ${brandColor}`,
-            background: hexA(brandColor, 0.14),
-            fontSize: 34,
-            fontWeight: W.bold,
-            color: PALETTE.white,
-          }}
-        >
+      {/* 상단 — 기업명 배지 + 시리즈 레이블 */}
+      <div style={{
+        position: "absolute",
+        top: 52, left: 60,
+        display: "flex", alignItems: "center", gap: 16,
+      }}>
+        <div style={{
+          padding: "10px 24px",
+          border: `2.5px solid ${brandColor}`,
+          borderRadius: 5,
+          fontSize: 32,
+          fontWeight: W.bold,
+          color: brandColor,
+          letterSpacing: 1,
+        }}>
           {company}
         </div>
-        <div style={{ fontSize: 28, fontWeight: W.semibold, color: PALETTE.gray, letterSpacing: 2 }}>
+        <div style={{
+          fontSize: 24,
+          fontWeight: W.semibold,
+          color: PALETTE.gray,
+          letterSpacing: 3,
+        }}>
           연봉 딥다이브
         </div>
       </div>
 
-      {/* 메인 카피 */}
-      <div style={{ position: "absolute", left: 64, top: 150, display: "flex", flexDirection: "column" }}>
-        <div style={{ fontSize: 46, fontWeight: W.bold, color: PALETTE.gray, marginBottom: 4 }}>
-          신입 첫 달 <span style={{ color: PALETTE.white }}>실수령</span>
+      {/* 메인 카피 블록 — 좌정렬 (인간이 만든 비대칭 레이아웃) */}
+      <div style={{
+        position: "absolute",
+        left: 60, top: 148,
+      }}>
+        {/* 라벨 — 형광펜 하이라이트 */}
+        <div style={{
+          fontSize: 40,
+          fontWeight: W.semibold,
+          color: PALETTE.gray,
+          marginBottom: 4,
+          letterSpacing: 2,
+        }}>
+          신입 첫 달{" "}
+          <span style={{
+            background: PALETTE.highlight,
+            color: "#111",
+            padding: "0 8px 3px",
+            borderRadius: 3,
+          }}>
+            실수령
+          </span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <span
-            style={{
-              fontSize: 230,
-              fontWeight: W.black,
-              color: PALETTE.net,
-              lineHeight: 0.9,
-              letterSpacing: -6,
-              textShadow: `0 0 60px ${PALETTE.netGlow}`,
-            }}
-          >
+        {/* 핵심 숫자 — 글로우 없는 순수한 흰색 */}
+        <div style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 6,
+          lineHeight: 0.9,
+        }}>
+          <span style={{
+            fontSize: 260,
+            fontWeight: W.black,
+            color: "#ffffff",
+            letterSpacing: -10,
+          }}>
             {net1}
           </span>
-          <span style={{ fontSize: 76, fontWeight: W.extrabold, color: PALETTE.net }}>만원</span>
+          <span style={{
+            fontSize: 80,
+            fontWeight: W.extrabold,
+            color: "#cccccc",
+          }}>
+            만원
+          </span>
         </div>
+
+        {/* 구분선 */}
+        <div style={{
+          width: 540,
+          height: 2,
+          background: "rgba(255,255,255,0.12)",
+          margin: "16px 0",
+        }} />
 
         {/* 30년차 라인 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14 }}>
-          <span style={{ fontSize: 46, fontWeight: W.bold, color: PALETTE.gray }}>30년차엔</span>
-          <span
-            style={{
-              fontSize: 84,
-              fontWeight: W.black,
-              color: PALETTE.gold,
-              letterSpacing: -2,
-              textShadow: `0 0 40px ${hexA(PALETTE.gold, 0.45)}`,
-            }}
-          >
+        <div style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 16,
+        }}>
+          <span style={{
+            fontSize: 40,
+            fontWeight: W.semibold,
+            color: PALETTE.gray,
+          }}>
+            30년차 세전
+          </span>
+          <span style={{
+            fontSize: 86,
+            fontWeight: W.black,
+            color: PALETTE.warmGold,
+            letterSpacing: -2,
+          }}>
             {grossLast}
           </span>
-          <span style={{ fontSize: 46, fontWeight: W.bold, color: PALETTE.gray }}>까지</span>
+          <span style={{
+            fontSize: 40,
+            fontWeight: W.semibold,
+            color: PALETTE.gray,
+          }}>
+            까지
+          </span>
         </div>
       </div>
 
-      {/* 하단 후킹 태그 */}
-      <div
-        style={{
-          position: "absolute",
-          left: 64,
-          bottom: 46,
-          padding: "16px 30px",
-          borderRadius: 16,
-          background: hexA(brandColor, 0.18),
-          border: `1.5px solid ${hexA(brandColor, 0.55)}`,
-          fontSize: 38,
+      {/* 우하단 — 빨간 스탬프 (약간 기울어진 것 = 손으로 찍은 느낌) */}
+      <div style={{
+        position: "absolute",
+        right: 62, bottom: 54,
+        textAlign: "right",
+      }}>
+        <div style={{
+          display: "inline-block",
+          padding: "12px 26px",
+          border: `3px solid ${PALETTE.marker}`,
+          borderRadius: 5,
+          fontSize: 32,
           fontWeight: W.extrabold,
-          color: PALETTE.white,
-        }}
-      >
-        호봉표 그대로 <span style={{ color: brandColor }}>전격 공개</span>
+          color: PALETTE.marker,
+          letterSpacing: 2,
+          transform: "rotate(-2deg)",
+        }}>
+          호봉표 전격공개
+        </div>
+        <div style={{
+          marginTop: 10,
+          fontSize: 20,
+          color: "#444",
+          letterSpacing: 1,
+        }}>
+          알리오 공식자료 기준 · {comma(first.annual_gross_10k)}만 → {comma(last.annual_gross_10k)}만
+        </div>
       </div>
-
-      {/* 우하단 신뢰 배지 */}
-      <div
-        style={{
-          position: "absolute",
-          right: 56,
-          bottom: 50,
-          textAlign: "right",
-          fontSize: 25,
-          fontWeight: W.semibold,
-          color: PALETTE.dim,
-          lineHeight: 1.45,
-        }}
-      >
-        세전 {comma(first.annual_gross_10k)}만 → {comma(last.annual_gross_10k)}만
-        <br />
-        알리오 보수규정 기준
-      </div>
-
-      {/* 비네팅 */}
-      <AbsoluteFill
-        style={{
-          boxShadow: "inset 0 0 240px rgba(0,0,0,0.55)",
-          pointerEvents: "none",
-        }}
-      />
     </AbsoluteFill>
   );
 };

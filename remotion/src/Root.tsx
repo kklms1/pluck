@@ -2,7 +2,7 @@ import { Composition, Series, AbsoluteFill, interpolate, useCurrentFrame } from 
 import { Thumbnail } from "./components/Thumbnail";
 import { SalaryScene } from "./components/SalaryScene";
 import { BankAlert } from "./components/BankAlert";
-import { PALETTE, W, bgGradient, hexA } from "./theme";
+import { PALETTE, W, hexA } from "./theme";
 import { DeepDiveProps, won } from "./lib/format";
 import { ensureFonts } from "./load-fonts";
 import sample from "../public/props.json";
@@ -17,18 +17,80 @@ const HookScene: React.FC<DeepDiveProps> = (props) => {
   const frame = useCurrentFrame();
   const first = props.career[0];
   const last = props.career[props.career.length - 1];
-  const up = interpolate(frame, [0, 20], [40, 0], { extrapolateRight: "clamp" });
-  const op = interpolate(frame, [0, 20], [0, 1], { extrapolateRight: "clamp" });
+
+  // 단순한 페이드+슬라이드 — 스프링 없이 직접적
+  const op = interpolate(frame, [0, 14], [0, 1], { extrapolateRight: "clamp" });
+  const up = interpolate(frame, [0, 14], [28, 0], { extrapolateRight: "clamp" });
+
+  // 숫자 카운트업 (25프레임에 완성)
+  const count = Math.round(
+    interpolate(frame, [8, 32], [0, first.monthly_net_10k], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
+  );
+
   return (
-    <AbsoluteFill style={{ background: bgGradient(props.brandColor), fontFamily: "Pretendard", color: PALETTE.white, justifyContent: "center", alignItems: "center" }}>
+    <AbsoluteFill style={{
+      background: PALETTE.ink,
+      fontFamily: "Pretendard",
+      color: PALETTE.white,
+      justifyContent: "center",
+      alignItems: "center",
+    }}>
+      {/* 좌측 브랜드 세로막대 */}
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 10, background: props.brandColor }} />
+
       <div style={{ transform: `translateY(${up}px)`, opacity: op, textAlign: "center" }}>
-        <div style={{ fontSize: 48, fontWeight: W.bold, color: props.brandColor }}>{props.company}</div>
-        <div style={{ fontSize: 64, fontWeight: W.semibold, color: PALETTE.gray, marginTop: 30 }}>신입 첫 달 실수령</div>
-        <div style={{ fontSize: 300, fontWeight: W.black, color: PALETTE.net, lineHeight: 1, textShadow: `0 0 80px ${PALETTE.netGlow}` }}>
-          {Math.round(first.monthly_net_10k)}<span style={{ fontSize: 100 }}>만원</span>
+        {/* 기업명 */}
+        <div style={{
+          fontSize: 46,
+          fontWeight: W.bold,
+          color: props.brandColor,
+          letterSpacing: 4,
+          marginBottom: 12,
+        }}>
+          {props.company}
         </div>
-        <div style={{ fontSize: 56, fontWeight: W.bold, color: PALETTE.gray, marginTop: 20 }}>
-          30년차엔 <span style={{ color: PALETTE.gold, fontWeight: W.black }}>{won(last.annual_gross_10k)}</span>까지
+
+        {/* 라벨 — 형광펜 효과 */}
+        <div style={{
+          fontSize: 56,
+          fontWeight: W.semibold,
+          color: PALETTE.gray,
+          marginBottom: 10,
+        }}>
+          신입 첫 달{" "}
+          <span style={{
+            background: PALETTE.highlight,
+            color: "#111",
+            padding: "0 10px 4px",
+            borderRadius: 3,
+          }}>
+            실수령
+          </span>
+        </div>
+
+        {/* 핵심 숫자 — 글로우 없음 */}
+        <div style={{
+          fontSize: 300,
+          fontWeight: W.black,
+          color: "#ffffff",
+          lineHeight: 0.9,
+          letterSpacing: -10,
+        }}>
+          {count}<span style={{ fontSize: 100, color: "#cccccc" }}>만원</span>
+        </div>
+
+        {/* 30년차 라인 */}
+        <div style={{
+          fontSize: 56,
+          fontWeight: W.bold,
+          color: PALETTE.gray,
+          marginTop: 24,
+        }}>
+          30년차엔{" "}
+          <span style={{ color: PALETTE.warmGold, fontWeight: W.black }}>
+            {won(last.annual_gross_10k)}
+          </span>
+          까지
         </div>
       </div>
     </AbsoluteFill>
@@ -38,14 +100,71 @@ const HookScene: React.FC<DeepDiveProps> = (props) => {
 const CtaScene: React.FC<DeepDiveProps> = (props) => {
   ensureFonts();
   const frame = useCurrentFrame();
-  const op = interpolate(frame, [0, 25], [0, 1], { extrapolateRight: "clamp" });
+  const op = interpolate(frame, [0, 20], [0, 1], { extrapolateRight: "clamp" });
   return (
-    <AbsoluteFill style={{ background: bgGradient(props.brandColor), fontFamily: "Pretendard", color: PALETTE.white, justifyContent: "center", alignItems: "center", opacity: op }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 88, fontWeight: W.black }}>{props.company} 합격의 모든 것</div>
-        <div style={{ marginTop: 50, fontSize: 52, fontWeight: W.bold, color: PALETTE.net }}>자기소개서 기출 분석 PDF</div>
-        <div style={{ marginTop: 16, fontSize: 52, fontWeight: W.bold, color: PALETTE.net }}>NCS + 직무 기출변형 문제집</div>
-        <div style={{ marginTop: 60, fontSize: 40, color: PALETTE.gray }}>▶ 설명란 링크 · 구독하면 다음 기업 딥다이브 알림</div>
+    <AbsoluteFill style={{
+      background: PALETTE.ink,
+      fontFamily: "Pretendard",
+      color: PALETTE.white,
+      justifyContent: "center",
+      alignItems: "center",
+      opacity: op,
+    }}>
+      {/* 좌측 브랜드 막대 */}
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 10, background: props.brandColor }} />
+
+      <div style={{ textAlign: "left", paddingLeft: 120 }}>
+        {/* 타이틀 */}
+        <div style={{ fontSize: 80, fontWeight: W.black, color: PALETTE.white, lineHeight: 1.1 }}>
+          {props.company}
+          <br />
+          <span style={{
+            background: PALETTE.highlight,
+            color: "#111",
+            padding: "2px 14px 6px",
+            borderRadius: 4,
+          }}>
+            합격의 모든 것
+          </span>
+        </div>
+
+        {/* 구분선 */}
+        <div style={{
+          width: 600,
+          height: 3,
+          background: `rgba(255,255,255,0.15)`,
+          margin: "36px 0",
+        }} />
+
+        {/* 상품 목록 — 체크 리스트 스타일 */}
+        {["자기소개서 기출 분석 PDF", "NCS + 직무 기출변형 문제집"].map((item) => (
+          <div key={item} style={{
+            display: "flex", alignItems: "center", gap: 18,
+            fontSize: 48, fontWeight: W.bold,
+            color: PALETTE.white,
+            marginBottom: 16,
+          }}>
+            <div style={{
+              width: 36, height: 36,
+              borderRadius: 4,
+              background: props.brandColor,
+              flexShrink: 0,
+            }} />
+            {item}
+          </div>
+        ))}
+
+        {/* 행동 유도 */}
+        <div style={{
+          marginTop: 40,
+          fontSize: 34,
+          color: PALETTE.gray,
+          letterSpacing: 1,
+        }}>
+          ▶ 설명란 링크{" "}
+          <span style={{ color: PALETTE.white }}>·</span>{" "}
+          구독하면 다음 기업 딥다이브 알림
+        </div>
       </div>
     </AbsoluteFill>
   );

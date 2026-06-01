@@ -1,20 +1,29 @@
 /**
  * 디자인 시스템 — 공기업 연봉 딥다이브
- * 컨셉: 프리미엄 금융 다크 (딥네이비 + 네온그린 실수령 + 골드 강조)
+ * 컨셉: 정보 채널 — 진짜 사람이 만든 느낌 (굵은 활자 + 형광펜 + 빨간 동그라미)
  */
 
 export const PALETTE = {
-  bgTop: "#0b1020",
-  bgBottom: "#161f38",
+  // 배경
+  ink: "#111111",        // 메인 다크 배경 (그라디언트 없는 단색)
+  inkSoft: "#1a1a1a",
+  cream: "#faf8f0",      // 문서/종이 느낌 배경
+  // 텍스트
+  white: "#f5f5f5",
+  offWhite: "#e8e6e0",
+  gray: "#888888",
+  dim: "#555555",
+  // 사람 손맛 강조색
+  highlight: "#ffe432",  // 형광펜 노랑
+  marker: "#e53e3e",     // 빨간 펜
+  warmGold: "#f5c842",   // 골드 (글로우 없이도 눈에 띄는 채도)
+  // 하위호환 (SalaryScene 등에서 사용)
   card: "rgba(255,255,255,0.045)",
   cardBorder: "rgba(255,255,255,0.09)",
-  white: "#f5f7fb",
-  gray: "#9aa6bf",
-  dim: "#64718f",
-  net: "#34f5a3", // 월 실수령 네온그린
+  net: "#34f5a3",
   netGlow: "rgba(52,245,163,0.5)",
-  gold: "#ffc83c", // 강조/마일스톤
-  danger: "#ff6b6b", // 순환 잦음 등 경고
+  gold: "#ffc83c",
+  danger: "#e53e3e",
   brandDefault: "#3aa0ff",
 };
 
