@@ -1,6 +1,7 @@
 import { Composition, Series, AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { Thumbnail } from "./components/Thumbnail";
 import { SalaryScene } from "./components/SalaryScene";
+import { BankAlert } from "./components/BankAlert";
 import { PALETTE, W, bgGradient, hexA } from "./theme";
 import { DeepDiveProps, won } from "./lib/format";
 import { ensureFonts } from "./load-fonts";
@@ -89,6 +90,15 @@ export const RemotionRoot: React.FC = () => {
         fps={FPS}
         width={1280}
         height={720}
+        defaultProps={data}
+      />
+      <Composition
+        id="BankAlert"
+        component={BankAlert}
+        durationInFrames={120}
+        fps={FPS}
+        width={1920}
+        height={1080}
         defaultProps={data}
       />
       <Composition
