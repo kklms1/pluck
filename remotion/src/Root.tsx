@@ -50,6 +50,13 @@ const CtaScene: React.FC<DeepDiveProps> = (props) => {
   );
 };
 
+// 정지 미리보기용 — 대표 연차(6년차 또는 중앙)를 settled 상태로 표시
+const SalaryCardStill: React.FC<DeepDiveProps> = (props) => {
+  const career = props.career || [];
+  const pick = career.find((p) => p.career_year === 6) || career[Math.floor(career.length / 2)] || career[0];
+  return <SalaryScene point={pick} company={props.company} brandColor={props.brandColor} total={career.length} />;
+};
+
 const DeepDive: React.FC<DeepDiveProps> = (props) => {
   const career = props.career || [];
   return (
@@ -82,6 +89,15 @@ export const RemotionRoot: React.FC = () => {
         fps={FPS}
         width={1280}
         height={720}
+        defaultProps={data}
+      />
+      <Composition
+        id="SalaryCard"
+        component={SalaryCardStill}
+        durationInFrames={60}
+        fps={FPS}
+        width={1920}
+        height={1080}
         defaultProps={data}
       />
       <Composition

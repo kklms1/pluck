@@ -10,7 +10,7 @@ from typing import Optional
 import logging
 
 from .regulation_parser import ParsedSalaryTable, HobongRow
-from .salary_analyzer import calc_monthly_net, YearlySalary
+from .salary_analyzer import calc_monthly_net, calc_income_tax, INSURANCE_RATES, YearlySalary
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class CareerPoint:
     career_year: int            # 입사 후 연차
     grade: str                  # 직급
     hobong: int                 # 호봉
-    base_salary_10k: int        # 기본급 (만원)
+    base_salary_10k: int        # 기본급 (만원/월)
     total_allowance_10k: float  # 수당 합계 (만원/월)
     annual_gross_10k: int       # 세전 연봉 (만원)
     monthly_gross_10k: float    # 월 세전 (만원)
@@ -46,6 +46,12 @@ class CareerPoint:
     tax_rate_pct: float
     insurance_10k: float = 0.0    # 월 4대보험 (만원)
     income_tax_10k: float = 0.0   # 월 소득세+지방세 (만원)
+    # 항목별 명세 (보수명세 카드용, 만원/월)
+    fixed_allow_10k: float = 0.0     # 고정수당 (식대·교통비 등)
+    perform_allow_10k: float = 0.0   # 실적수당
+    welfare_10k: float = 0.0         # 복리후생비
+    bonus_10k: float = 0.0           # 성과상여금 (월 환산)
+    monthly_regular_net_10k: float = 0.0  # 평달 실수령 (성과급 제외)
 
 
 def build_career_table(
@@ -67,19 +73,21 @@ def build_career_table(
         logger.warning("호봉 테이블 비어있음 — 추정 모드로 전환")
         return []
 
-    # 고정 수당 합계 (식대·교통비 등 절대 금액)
-    fixed_monthly = sum(parsed.allowances.values())
-    logger.info(f"  월 고정수당 합계: {fixed_monthly:.1f}만원")
+    # 고정 수당을 항목 성격별로 분류 (고정수당 / 실적수당 / 복리후생비)
+    fixed_allow, perform_allow, welfare_cost = _categorize_allowances(parsed.allowances)
+    fixed_monthly = fixed_allow + perform_allow + welfare_cost
+    logger.info(f"  월 수당: 고정 {fixed_allow:.1f} · 실적 {perform_allow:.1f} · 복리후생 {welfare_cost:.1f}만원")
 
-    # 기본급 비례 수당 연간 배수 합계 (성과급 3.0 + 명절상여 2.0 = 5.0)
+    # 기본급 비례 수당 연간 배수 합계 (성과급 3.0 + 명절상여 2.0 = 5.0) → 성과상여금
     ratio_total = sum(parsed.allowance_ratios.values())
     if not ratio_total:
-        # allowance_ratios 없으면 공기업 평균 기준 추정 (연간 기본급 × 500%)
         ratio_total = 5.0
         logger.info(f"  비례수당 배수 없음 → 공기업 평균 {ratio_total}배 적용")
     else:
-        logger.info(f"  비례수당 연간 배수: {ratio_total:.1f}배 "
+        logger.info(f"  성과상여금 연간 배수: {ratio_total:.1f}배 "
                     f"({dict(parsed.allowance_ratios)})")
+
+    insurance_rate = sum(INSURANCE_RATES.values())
 
     results = []
     for career_year in _key_years(max_years):
@@ -95,28 +103,55 @@ def build_career_table(
             logger.debug(f"  {career_year}년차 {grade} {hobong}호봉: 기본급 없음")
             continue
 
-        # 기본급 비례 수당 월 환산: base × 연간배수 / 12
-        ratio_monthly = base * ratio_total / 12
-        total_monthly = base + fixed_monthly + ratio_monthly
+        # 성과상여금 월 환산: base × 연간배수 / 12
+        bonus_monthly = base * ratio_total / 12
+        # 평달(성과급 제외) 월 보수 = 기본급+고정수당+실적수당+복리후생비
+        regular_monthly = base + fixed_allow + perform_allow + welfare_cost
+        total_monthly = regular_monthly + bonus_monthly
 
-        annual_gross = round(total_monthly * 12 / 100) * 100
+        annual_gross = round(total_monthly * 12)  # 1만원 단위
         net_info = calc_monthly_net(annual_gross)
+
+        # 평달 실수령: 평달 보수 - (평달 4대보험) - (월 소득세, 연간 기준)
+        income_tax_monthly = calc_income_tax(annual_gross) / 12
+        regular_net = regular_monthly - regular_monthly * insurance_rate - income_tax_monthly
 
         results.append(CareerPoint(
             career_year=career_year,
             grade=grade,
             hobong=hobong,
             base_salary_10k=base,
-            total_allowance_10k=fixed_monthly + ratio_monthly,
+            total_allowance_10k=fixed_monthly + bonus_monthly,
             annual_gross_10k=annual_gross,
             monthly_gross_10k=net_info["monthly_gross_10k"],
             monthly_net_10k=net_info["monthly_net_10k"],
             tax_rate_pct=net_info["tax_rate_pct"],
             insurance_10k=net_info["insurance_10k"],
             income_tax_10k=net_info["income_tax_10k"],
+            fixed_allow_10k=round(fixed_allow, 1),
+            perform_allow_10k=round(perform_allow, 1),
+            welfare_10k=round(welfare_cost, 1),
+            bonus_10k=round(bonus_monthly, 1),
+            monthly_regular_net_10k=round(regular_net, 1),
         ))
 
     return results
+
+
+def _categorize_allowances(allowances: dict[str, float]) -> tuple[float, float, float]:
+    """
+    수당 dict를 (고정수당, 실적수당, 복리후생비) 월 합계로 분류.
+    보수명세 카드의 항목 구성을 위해 키워드로 성격 구분.
+    """
+    fixed, perform, welfare = 0.0, 0.0, 0.0
+    for name, amount in (allowances or {}).items():
+        if any(k in name for k in ["복지", "후생", "복리", "포인트"]):
+            welfare += amount
+        elif any(k in name for k in ["실적", "성과수당", "직무성과"]):
+            perform += amount
+        else:
+            fixed += amount
+    return fixed, perform, welfare
 
 
 def _grade_for_year(career_year: int) -> str:

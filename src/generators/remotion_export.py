@@ -39,6 +39,13 @@ def build_props(
             "tax_rate_pct": round(g(p, "tax_rate_pct"), 1),
             "insurance_10k": round(g(p, "insurance_10k", 0), 1),
             "income_tax_10k": round(g(p, "income_tax_10k", 0), 1),
+            # 항목별 명세 (만원/월)
+            "base_salary_10k": g(p, "base_salary_10k"),
+            "fixed_allow_10k": round(g(p, "fixed_allow_10k", 0), 1),
+            "perform_allow_10k": round(g(p, "perform_allow_10k", 0), 1),
+            "welfare_10k": round(g(p, "welfare_10k", 0), 1),
+            "bonus_10k": round(g(p, "bonus_10k", 0), 1),
+            "monthly_regular_net_10k": round(g(p, "monthly_regular_net_10k", 0), 1),
         }
         for p in (career_points or [])
     ]
